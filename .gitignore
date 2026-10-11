@@ -87,3 +87,7 @@ skills/openclaw/video-production/vendor/**/node_modules/
 skills/openclaw/video-production/vendor/**/.remotion/
 skills/openclaw/video-production/vendor/**/models/
 skills/openclaw/video-production/vendor/**/*large-v3*
+
+# Automation dashboard (GitHub Actions + object storage demo)
+.cache/
+dist-objects/

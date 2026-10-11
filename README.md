@@ -374,10 +374,25 @@ Easel/
 ├── profiles/                 账号画像（每个画像一个目录）
 ├── outputs/                  内容项目与最终产物
 ├── openclaw/                 隔离 profile、workspace 与同步脚本
-└── docs/                     能力规范、能力地图与架构文档
+├── dashboard/                自动化控制台（GitHub Pages 静态面板）
+├── data/                     CRUD "数据库"（data/db.json）与自动化状态
+├── functions/                按需执行的 serverless 风格脚本（缓存 / object storage / 报告）
+└── docs/                     能力规范、能力地图、架构文档与自动化控制台指南
 ```
 
 Easel 使用独立的 `easel` OpenClaw profile，不会覆盖你本机已有的 OpenClaw 配置。Web 默认运行在 `7860`；gateway 端口由 OpenClaw 决定（非默认 profile 会分配哈希端口，如 `easel` → `37289`，不是 `18789`），Easel 会自动解析，无需手配。
+
+## 🤖 自动化控制台 / Automation Control Center
+
+仓库内置了一套基于 GitHub 原生能力的自动化面板：GitHub Pages 发布的静态
+Dashboard，按钮直接触发 GitHub Actions（CRUD 后端、Functions、缓存、以
+Artifacts/Release 实现的 object storage），全部可在 Actions 标签页验证。
+详见 [docs/automation-dashboard.md](docs/automation-dashboard.md)（葡萄牙语）。
+
+- 后端 CRUD：`scripts/db_crud.py` + `data/db.json`
+- Functions：`functions/stats_indexer.py`（缓存）、`backup_object.py`（object storage）、`report.py`
+- Pipelines：`.github/workflows/crud-data.yml`、`functions.yml`、`pages.yml`
+- 面板源码：`dashboard/`
 
 ## 📑 文档
 
@@ -386,6 +401,7 @@ Easel 使用独立的 `easel` OpenClaw profile，不会覆盖你本机已有的 
 - [提示词与架构分层](docs/prompt-stack.md)
 - [已知问题](docs/known-issues.md)
 - [完整致谢](docs/ACKNOWLEDGMENTS.md)
+- [自动化控制台指南](docs/automation-dashboard.md)
 
 ## 🗺️ 开发计划（Roadmap）
 

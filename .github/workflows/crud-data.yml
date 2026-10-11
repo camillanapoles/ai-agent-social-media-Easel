@@ -1,0 +1,145 @@
+name: Backend · CRUD Data
+
+# Backend CRUD acionado por botão (workflow_dispatch) a partir do painel de
+# automação (dashboard/) publicado no GitHub Pages, ou diretamente pela aba
+# Actions do GitHub. Também aceita repository_dispatch para integrações
+# externas (ex.: `curl -X POST .../dispatches -d '{"event_type":"crud"}'`).
+#
+# O que esta pipeline demonstra, de ponta a ponta:
+#   - CRUD real sobre `data/db.json` (scripts/db_crud.py)
+#   - cache de dependências (actions/cache / setup-python cache=pip)
+#   - "object storage" via Actions Artifact + GitHub Release permanente
+#   - persistência via commit automático de volta ao repositório
+#   - rastreabilidade via Job Summary + data/automation-status.json
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Operação CRUD"
+        type: choice
+        required: true
+        default: list
+        options: [list, create, read, update, delete]
+      id:
+        description: "ID do registro (necessário para read/update/delete)"
+        type: string
+        required: false
+        default: ""
+      title:
+        description: "Título (create/update)"
+        type: string
+        required: false
+        default: ""
+      status:
+        description: "Status (create/update)"
+        type: choice
+        required: false
+        default: draft
+        options: [draft, scheduled, published, archived]
+      channel:
+        description: "Canal (create/update)"
+        type: string
+        required: false
+        default: ""
+  repository_dispatch:
+    types: [crud-data]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crud-data
+  cancel-in-progress: false
+
+jobs:
+  crud:
+    name: CRUD (${{ inputs.operation || 'list' }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # Cache dedicado ao índice de estatísticas (functions/stats_indexer.py):
+      # chave baseada no conteúdo de data/db.json, então rodadas repetidas sem
+      # mudança de dados reaproveitam o resultado sem recalcular.
+      - name: Restore stats cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/stats
+          key: stats-index-${{ hashFiles('data/db.json') }}
+          restore-keys: |
+            stats-index-
+
+      - name: Run CRUD operation
+        # Os inputs chegam via variáveis de ambiente (nunca interpolados direto
+        # na string do `run:`) para evitar script injection — prática padrão
+        # recomendada pelo próprio GitHub para workflows com entrada de usuário.
+        env:
+          OPERATION: ${{ inputs.operation || 'list' }}
+          REC_ID: ${{ inputs.id }}
+          REC_TITLE: ${{ inputs.title }}
+          REC_STATUS: ${{ inputs.status }}
+          REC_CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          args=("$OPERATION")
+          [ -n "$REC_ID" ] && args+=(--id "$REC_ID")
+          [ -n "$REC_TITLE" ] && args+=(--title "$REC_TITLE")
+          [ -n "$REC_STATUS" ] && args+=(--status "$REC_STATUS")
+          [ -n "$REC_CHANNEL" ] && args+=(--channel "$REC_CHANNEL")
+          python scripts/db_crud.py "${args[@]}"
+
+      - name: Reindex stats (cache demo)
+        run: python functions/stats_indexer.py
+
+      - name: "Upload data snapshot as artifact (object storage: short-term)"
+        uses: actions/upload-artifact@v4
+        with:
+          name: easel-data-snapshot-${{ github.run_number }}
+          path: |
+            data/db.json
+            data/stats.json
+            data/automation-status.json
+          retention-days: 30
+
+      - name: "Publish permanent object to the data-store release (object storage: long-term)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view data-store >/dev/null 2>&1; then
+            gh release create data-store \
+              --title "Easel · Data Store (object storage)" \
+              --notes "Snapshot persistente de data/db.json, mantido pelo workflow crud-data.yml." \
+              --latest=false
+          fi
+          gh release upload data-store data/db.json data/stats.json --clobber
+
+      - name: Commit updated data back to the repository
+        run: |
+          set -euo pipefail
+          git config user.name "easel-automation-bot"
+          git config user.email "automation@users.noreply.github.com"
+          git add data/db.json data/stats.json data/automation-status.json
+          if git diff --cached --quiet; then
+            echo "Sem mudanças de dados para commitar."
+          else
+            git commit -m "chore(data): ${{ inputs.operation || 'list' }} via CRUD pipeline [skip ci]"
+            git push
+          fi
+
+      - name: Job summary footer
+        if: always()
+        run: |
+          {
+            echo "---"
+            echo "Artifact: \`easel-data-snapshot-${{ github.run_number }}\`"
+            echo "Release (object storage permanente): [data-store](${{ github.server_url }}/${{ github.repository }}/releases/tag/data-store)"
+          } >> "$GITHUB_STEP_SUMMARY"

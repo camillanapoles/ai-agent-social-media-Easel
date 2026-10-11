@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "updated_at": "2026-10-11T00:00:00Z",
+  "records": [
+    {
+      "id": 1,
+      "title": "Post de lançamento — Easel",
+      "status": "published",
+      "channel": "wechat",
+      "created_at": "2026-10-01T12:00:00Z",
+      "updated_at": "2026-10-01T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "title": "Roteiro de vídeo semanal",
+      "status": "draft",
+      "channel": "video",
+      "created_at": "2026-10-05T09:30:00Z",
+      "updated_at": "2026-10-05T09:30:00Z"
+    },
+    {
+      "id": 3,
+      "title": "Campanha de automação CI/CD",
+      "status": "scheduled",
+      "channel": "blog",
+      "created_at": "2026-10-09T18:15:00Z",
+      "updated_at": "2026-10-09T18:15:00Z"
+    }
+  ]
+}

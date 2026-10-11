@@ -311,10 +311,29 @@ Easel/
 ├── profiles/                 Account profiles
 ├── outputs/                  Content projects and final deliverables
 ├── openclaw/                 Isolated profile, workspace, and sync scripts
-└── docs/                     Specifications, capability map, and architecture docs
+├── dashboard/                Automation Control Center (GitHub Pages static panel)
+├── data/                     CRUD "database" (data/db.json) and automation status
+├── functions/                On-demand serverless-style scripts (cache / object storage / report)
+└── docs/                     Specifications, capability map, architecture docs, and automation guide
 ```
 
 Easel uses an isolated `easel` OpenClaw profile and does not overwrite an existing OpenClaw setup. The Web workspace defaults to port `7860`; the gateway port is chosen by OpenClaw (non-default profiles get a hashed port — `easel` → `37289`, not `18789`) and is resolved automatically by Easel.
+
+## 🤖 Automation Control Center
+
+The repository ships a GitHub-native automation layer: a static dashboard
+published on **GitHub Pages** whose buttons trigger real **GitHub Actions**
+pipelines — a CRUD backend, on-demand functions, dependency/data caching, and
+"object storage" implemented with Actions Artifacts + a permanent GitHub
+Release. No external cloud account is required; everything is verifiable from
+the repo's **Actions** tab. See
+[docs/automation-dashboard.md](docs/automation-dashboard.md) (Portuguese) for
+the full write-up.
+
+- Backend CRUD: `scripts/db_crud.py` + `data/db.json`
+- Functions: `functions/stats_indexer.py` (cache), `backup_object.py` (object storage), `report.py`
+- Pipelines: `.github/workflows/crud-data.yml`, `functions.yml`, `pages.yml`
+- Dashboard source: `dashboard/`
 
 ## 📑 Documentation
 
@@ -323,6 +342,7 @@ Easel uses an isolated `easel` OpenClaw profile and does not overwrite an existi
 - [Prompt and architecture layers](docs/prompt-stack.md)
 - [Known issues](docs/known-issues_EN.md)
 - [Full acknowledgments](docs/ACKNOWLEDGMENTS.md)
+- [Automation Control Center guide](docs/automation-dashboard.md)
 
 ## 🗺️ Roadmap
 
