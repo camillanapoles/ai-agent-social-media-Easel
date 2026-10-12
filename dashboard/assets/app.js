@@ -22,6 +22,17 @@ const WORKFLOWS = [
 
 const $ = (sel) => document.querySelector(sel);
 
+// Escapa texto vindo de fontes remotas (API do GitHub / data/db.json) antes de
+// injetar em innerHTML — defesa em profundidade: mesmo que workflow_dispatch
+// exija permissão de escrita no repositório para ser acionado, nunca
+// confiamos cegamente em strings vindas de fora ao montar HTML no cliente.
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[ch]));
+}
+
+
 function tokenKey() { return "easel_automation_pat"; }
 function getToken() { return localStorage.getItem(tokenKey()) || ""; }
 function setToken(v) { localStorage.setItem(tokenKey(), v); }
@@ -130,7 +141,7 @@ async function loadDb() {
     }
     for (const r of db.records) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${r.id}</td><td>${r.title}</td><td>${r.status}</td><td>${r.channel || "—"}</td><td>${fmtDate(r.updated_at)}</td>`;
+      tr.innerHTML = `<td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.title)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.channel || "—")}</td><td>${escapeHtml(fmtDate(r.updated_at))}</td>`;
       tbody.appendChild(tr);
     }
   } catch {
@@ -153,7 +164,7 @@ async function loadStorage() {
       for (const a of assets) {
         const row = document.createElement("div");
         row.className = "status-row";
-        row.innerHTML = `<span>${a.name}</span><a href="${a.browser_download_url}" target="_blank" rel="noopener">${(a.size / 1024).toFixed(1)} KB ↓</a>`;
+        row.innerHTML = `<span>${escapeHtml(a.name)}</span><a href="${encodeURI(a.browser_download_url)}" target="_blank" rel="noopener">${(a.size / 1024).toFixed(1)} KB ↓</a>`;
         el.appendChild(row);
       }
     } else {
@@ -178,7 +189,7 @@ async function loadStatus() {
       cacheEl.innerHTML += `<div class="status-row"><span>digest</span><span>${stats.digest}</span></div>`;
     }
     if (status.crud) {
-      cacheEl.innerHTML += `<div class="status-row"><span>última operação CRUD</span><span>${status.crud.last_operation} (${status.crud.record_count} registros)</span></div>`;
+      cacheEl.innerHTML += `<div class="status-row"><span>última operação CRUD</span><span>${escapeHtml(status.crud.last_operation)} (${escapeHtml(status.crud.record_count)} registros)</span></div>`;
     }
     if (!stats && !status.crud) cacheEl.innerHTML = `<div class="status-row"><span>ainda sem execuções registradas</span></div>`;
     return status;
@@ -200,7 +211,7 @@ async function loadRuns() {
       const b = badgeFor(run);
       const row = document.createElement("div");
       row.className = "status-row";
-      row.innerHTML = `<a href="${run.html_url}" target="_blank" rel="noopener">${run.name} #${run.run_number}</a><span class="badge ${b.cls}">${b.label}</span>`;
+      row.innerHTML = `<a href="${encodeURI(run.html_url)}" target="_blank" rel="noopener">${escapeHtml(run.name)} #${escapeHtml(run.run_number)}</a><span class="badge ${b.cls}">${escapeHtml(b.label)}</span>`;
       el.appendChild(row);
     }
     if (!data.workflow_runs || !data.workflow_runs.length) el.innerHTML = `<div class="status-row"><span>sem execuções ainda</span></div>`;
