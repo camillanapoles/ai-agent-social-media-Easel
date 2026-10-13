@@ -39,7 +39,8 @@ functions/
 └── report.py                 relatório consolidado em Markdown
 
 scripts/
-└── db_crud.py                CRUD (create/read/update/delete/list) — o "BACKEND"
+├── db_crud.py                CRUD (create/read/update/delete/list) — o "BACKEND"
+└── watchdog.py               monitora, recupera e cura as pipelines — a "CONTINUIDADE"
 
 dashboard/
 ├── index.html                painel (terminal web + cards de pipelines + tabelas)
@@ -49,6 +50,7 @@ dashboard/
 ├── ci.yml                    já existia — testes, skills, frontend, instaladores
 ├── crud-data.yml             botão "Backend · CRUD Data"
 ├── functions.yml             botão "Backend · Functions"
+├── watchdog.yml              roda sozinho (cron) — continuidade & auto-recuperação
 └── pages.yml                 publica dashboard/ no GitHub Pages
 ```
 
@@ -83,6 +85,9 @@ Em ambos os casos, o painel também traz um **terminal web** (`help`, `status`,
   integrações externas via `curl`.
 - **Backend · Functions** (`functions.yml`) — `workflow_dispatch` com input
   `function` (`stats_indexer` / `backup_object` / `report` / `all`).
+- **Watchdog** (`watchdog.yml`) — `schedule` a cada 6h + `workflow_dispatch` +
+  `repository_dispatch`. Monitora, reexecuta falhas, cura `data/db.json` e
+  alerta via Issue. Ver seção "Continuidade e recuperação" abaixo.
 - **Deploy do Painel** (`pages.yml`) — builda e publica `dashboard/` sempre
   que a pasta muda, ou manualmente.
 
@@ -90,6 +95,60 @@ Cada execução grava um resumo em **Job Summary** (visível direto na aba
 Actions) e atualiza `data/automation-status.json`, que é o que o dashboard lê
 para mostrar status de cache, CRUD e object storage sem precisar reconsultar
 a API do GitHub a cada detalhe.
+
+## Continuidade e recuperação (sem depender de nenhuma sessão de agente)
+
+Ponto central deste design: **uma vez na branch padrão, nada aqui depende de
+uma sessão de chat/agente estar aberta.** GitHub Actions é infraestrutura do
+próprio GitHub — os workflows ficam armazenados no repositório e são
+executados pelos runners do GitHub para sempre, acionados por qualquer uma
+destas 4 formas (todas funcionam com a sessão fechada, com o computador
+desligado, etc.):
+
+1. **Botão no painel** — abre a tela oficial de execução no GitHub.
+2. **CLI, de qualquer máquina com `gh` autenticado**:
+   ```bash
+   gh workflow run crud-data.yml --ref main -f operation=list
+   gh workflow run functions.yml --ref main -f function=report
+   gh workflow run watchdog.yml  --ref main
+   ```
+3. **Webhook / API, de qualquer sistema externo** (cron de terceiros, outro
+   CI, um script agendado no seu próprio computador, Zapier, etc.) — é o
+   `repository_dispatch`, já habilitado em `crud-data.yml` e `functions.yml`:
+   ```bash
+   curl -X POST \
+     -H "Authorization: token $SEU_TOKEN" \
+     -H "Accept: application/vnd.github+json" \
+     https://api.github.com/repos/<owner>/<repo>/dispatches \
+     -d '{"event_type":"crud-data"}'
+   ```
+4. **Agendamento automático (`schedule`)** — zero intervenção: o próprio
+   GitHub dispara o cron.
+
+### Watchdog: auto-recuperação de verdade
+
+`.github/workflows/watchdog.yml` + `scripts/watchdog.py` rodam sozinhos a
+cada 6 horas (além de sob demanda) e garantem:
+
+- **Reexecução automática de falhas** — se `crud-data.yml` ou
+  `functions.yml` falharem, o watchdog reexecuta só os jobs que falharam
+  (`gh run rerun --failed`), sem precisar de ninguém clicando em nada.
+- **Auto-cura de `data/db.json`** — se o "banco" ficar corrompido (JSON
+  inválido), o watchdog tenta restaurá-lo a partir do histórico do git (até
+  10 commits atrás) e, em último caso, a partir do backup permanente na
+  release `data-store` (object storage). Testado de ponta a ponta
+  corrompendo o arquivo de propósito em um clone descartável.
+- **Alerta humano quando a auto-recuperação não resolve** — se uma pipeline
+  falhar 3 vezes seguidas mesmo após tentativas de recuperação, o watchdog
+  abre (ou atualiza, sem duplicar) uma Issue rotulada `automation-alert`.
+- **Estado persistido no próprio repositório** — `data/automation-status.json`
+  guarda o histórico de falhas consecutivas entre execuções, já que cada run
+  do Actions é uma VM nova e descartável; o painel lê esse arquivo para
+  mostrar a saúde do sistema sem precisar consultar a API a cada detalhe.
+
+Em outras palavras: mergear este PR e fechar a sessão do agente **não
+interrompe nada** — pelo contrário, é exatamente o estado em que o sistema
+foi desenhado para operar.
 
 ## Habilitando o GitHub Pages (passo manual único)
 
@@ -117,6 +176,11 @@ python scripts/db_crud.py delete --id 1
 python functions/stats_indexer.py   # 1ª vez: cache MISS · repetir: cache HIT
 python functions/backup_object.py   # gera dist-objects/*.zip
 python functions/report.py
+
+# Watchdog (requer `gh` autenticado; --no-gh roda só a parte offline)
+python scripts/watchdog.py
+python scripts/watchdog.py --no-gh          # só valida integridade local, sem chamar a API
+python scripts/watchdog.py --no-recovery    # diagnostica sem reexecutar/curar nada
 
 # Painel (dashboard) — qualquer servidor estático
 cd dashboard && python3 -m http.server 8080

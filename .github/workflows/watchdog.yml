@@ -1,0 +1,64 @@
+name: Watchdog · CI/CD Continuity & Recovery
+
+# Garante que o CI/CD continue funcionando — e se auto-recupere — mesmo sem
+# nenhuma sessão de agente/chat aberta e sem intervenção humana. Isto roda
+# inteiramente nos servidores do GitHub, disparado por:
+#   - schedule (cron): verificação automática a cada 6h, para sempre;
+#   - workflow_dispatch: botão manual (painel, aba Actions ou `gh workflow run`);
+#   - repository_dispatch: webhook externo (`curl -X POST .../dispatches`).
+#
+# O que ele garante:
+#   1. Reexecuta automaticamente runs que falharam nas pipelines críticas
+#      (crud-data.yml, functions.yml, pages.yml).
+#   2. Detecta e repara corrupção em data/db.json (histórico git ou release
+#      permanente `data-store` como último recurso).
+#   3. Abre/atualiza uma Issue de alerta quando uma pipeline falha de forma
+#      persistente, para notificar um humano quando a auto-recuperação não
+#      for suficiente.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [watchdog]
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    name: Verificar continuidade e recuperar falhas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # histórico completo: necessário para o self-heal de data/db.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Run watchdog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/watchdog.py
+
+      - name: Commit updated status back to the repository
+        run: |
+          set -euo pipefail
+          git config user.name "easel-automation-bot"
+          git config user.email "automation@users.noreply.github.com"
+          git add data/automation-status.json data/db.json
+          if git diff --cached --quiet; then
+            echo "Sem mudanças para commitar."
+          else
+            git commit -m "chore(watchdog): continuity check [skip ci]"
+            git push
+          fi

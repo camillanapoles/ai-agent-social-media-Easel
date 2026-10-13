@@ -17,6 +17,7 @@ const WORKFLOWS = [
   { id: "ci.yml", title: "CI — testes + skills + frontend", desc: "pytest, validação de skills, lint/build do frontend, lint de instaladores." },
   { id: "crud-data.yml", title: "Backend · CRUD Data", desc: "Create/Read/Update/Delete sobre data/db.json, com cache e object storage." },
   { id: "functions.yml", title: "Backend · Functions", desc: "stats_indexer (cache), backup_object (object storage), report." },
+  { id: "watchdog.yml", title: "Watchdog · Continuidade & Recuperação", desc: "Roda sozinho a cada 6h: reexecuta falhas, cura data/db.json corrompido, alerta via Issue." },
   { id: "pages.yml", title: "Deploy do Painel (Pages)", desc: "Publica este próprio dashboard no GitHub Pages." },
 ];
 
@@ -191,7 +192,16 @@ async function loadStatus() {
     if (status.crud) {
       cacheEl.innerHTML += `<div class="status-row"><span>última operação CRUD</span><span>${escapeHtml(status.crud.last_operation)} (${escapeHtml(status.crud.record_count)} registros)</span></div>`;
     }
-    if (!stats && !status.crud) cacheEl.innerHTML = `<div class="status-row"><span>ainda sem execuções registradas</span></div>`;
+    const wd = status.watchdog;
+    if (wd) {
+      const dbLabel = wd.db_integrity_ok ? "OK ✅" : (wd.db_healed ? "restaurada 🩹" : "FALHOU ❌");
+      cacheEl.innerHTML += `<div class="status-row"><span>watchdog · última checagem</span><span>${escapeHtml(fmtDate(wd.checked_at))}</span></div>`;
+      cacheEl.innerHTML += `<div class="status-row"><span>watchdog · integridade dos dados</span><span>${dbLabel}</span></div>`;
+      if (wd.recovered && wd.recovered.length) {
+        cacheEl.innerHTML += `<div class="status-row"><span>watchdog · auto-recuperado</span><span>${escapeHtml(wd.recovered.join(", "))}</span></div>`;
+      }
+    }
+    if (!stats && !status.crud && !wd) cacheEl.innerHTML = `<div class="status-row"><span>ainda sem execuções registradas</span></div>`;
     return status;
   } catch {
     cacheEl.innerHTML = `<div class="status-row"><span>data/automation-status.json ainda não existe — rode alguma pipeline</span></div>`;

@@ -40,7 +40,10 @@ def resolve_script(doc: Path, token: str) -> Path | None:
     candidate = Path(token)
     if candidate.is_absolute():
         return candidate
-    if token.startswith(("skills/", "agents/")):
+    # Diretórios de topo que são sempre referenciados relativos à raiz do repo,
+    # mesmo quando citados por um doc em outra pasta (ex.: docs/*.md apontando
+    # para functions/ ou data/ usados pelo painel de automação).
+    if token.startswith(("skills/", "agents/", "functions/", "data/")):
         return ROOT / candidate
     if token.startswith("scripts/"):
         for parent in doc.parents:
