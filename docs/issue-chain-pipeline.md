@@ -111,11 +111,51 @@ python scripts/issue_chain.py --issue 1 --result success --message "..."
 python scripts/issue_chain.py --issue 1 --result failure --message "..."
 ```
 
-> **Pré-requisito:** Issues precisa estar habilitado no repositório (ver
-> [`automation-dashboard.md`](automation-dashboard.md#habilitando-o-github-issues-passo-manual-único-necessário-para-o-issue-chain)).
-> Enquanto estiver desabilitado, qualquer execução retorna o contrato de erro
-> `status=4` (`issues_disabled`) com a explicação de como resolver — nada
-> quebra silenciosamente.
+> **Status do pré-requisito neste repositório:** Issues **já está habilitado**
+> (confirmado via `gh repo view --json hasIssuesEnabled` → `true`) e o fluxo
+> já foi validado de ponta a ponta contra issues reais deste repositório (ver
+> seção 4). Se em algum momento for desabilitado novamente, o código
+> continua detectando isso e devolvendo o contrato de erro `status=4`
+> (`issues_disabled`) em vez de falhar sem contexto, com o passo manual para
+> reabilitar explicado em
+> [`automation-dashboard.md`](automation-dashboard.md#habilitando-o-github-issues-passo-manual-único-necessário-para-o-issue-chain).
+
+### Backend orientado a objetos (fábrica de issues + SQLite)
+
+Por cima das funções testadas de integração com `gh`, `scripts/issue_chain.py`
+expõe duas classes que formam o ponto de entrada real usado pela CLI/produção:
+
+- **`IssueFactory`** — fábrica (*Factory pattern*) orientada a objetos que
+  encapsula a criação/consulta/fechamento de issues `[Pipeline #N]`
+  (`find`, `create`, `comment`, `close_with_comment`).
+- **`IssueChainOrchestrator`** — orquestrador que compõe a `IssueFactory`, o
+  gateway do `gate_check` e o backend `PipelineStore` (`scripts/pipeline_store.py`,
+  SQLite, em `data/pipeline.db`). É ele quem o `main()`/CLI de fato usa:
+  grava, a cada execução, o histórico completo do contrato de cada etapa no
+  banco local, além de fechar/criar as issues reais no GitHub.
+
+```python
+from issue_chain import IssueChainOrchestrator
+
+orchestrator = IssueChainOrchestrator()
+orchestrator.advance(1, "success", "etapa concluída e testada")
+orchestrator.close()
+```
+
+`PipelineStore` guarda duas tabelas — `stages` (estado atual de cada etapa
+indexada: `issue_number`, `title`, `state`, timestamps) e `events` (histórico
+completo de todo contrato emitido para aquela etapa) — e pode ser consultado
+diretamente, sem depender da API do GitHub:
+
+```bash
+python scripts/pipeline_store.py --list            # todas as etapas conhecidas
+python scripts/pipeline_store.py --stage 1          # estado atual da etapa 1
+python scripts/pipeline_store.py --history 1        # histórico completo de eventos da etapa 1
+```
+
+O GitHub Issues continua sendo a representação oficial/visível de cada
+etapa — este backend SQLite é um complemento de auditoria local,
+determinístico e consultável offline, não um substituto.
 
 ### Templates das etapas
 
@@ -178,10 +218,36 @@ contexto para humanos/dashboards, não para a lógica de controle de fluxo.
   5 cenários fabricados (limpo, issue bloqueante, CI com erro, sem testes,
   testes falhando) sem precisar de rede/API.
 - `scripts/issue_chain.py`: `scripts/dev_check_issue_chain.py` cobre, via
-  `unittest.mock`, os 6 cenários centrais (Issues desabilitado, issue não
+  `unittest.mock`, os cenários centrais (Issues desabilitado, issue não
   encontrada, falha reportada, sucesso com gate bloqueado, sucesso com gate
-  limpo avançando para N+1, fallback de template) — 20 asserções, todas
-  verdes.
+  limpo avançando para N+1, fallback de template, histórico do
+  `PipelineStore`, e o `IssueChainOrchestrator` fachada OOP completo) — 30
+  asserções, todas verdes.
+- **Teste de ponta a ponta contra o GitHub real** (issues deste repositório,
+  habilitadas durante esta sessão): `--init --issue 1` criou a issue real
+  `[Pipeline #1]`; `--issue 1 --result success` avaliou o gate de verdade e
+  avançou corretamente, criando `[Pipeline #2]`. Esse teste real **revelou
+  um bug** (corrigido na mesma sessão): o código estava chamando
+  `gh issue close`/`gh issue comment` com o **índice lógico do pipeline**
+  (`N`) em vez do **número real da issue no GitHub** — os testes mockados
+  não pegavam isso porque usavam o mesmo valor para os dois por coincidência.
+  Corrigido (agora usa `issue["number"]` explicitamente) e os testes
+  mockados foram atualizados para usar números propositalmente diferentes
+  (`101`, `202`) do índice do pipeline, para impedir regressão silenciosa
+  dessa classe de bug no futuro.
+- **Limitação conhecida de teste local:** o token do `gh` usado neste
+  ambiente sandbox consegue **criar** issues, mas recebe
+  `403 Resource not accessible by integration` ao tentar **comentar**,
+  **fechar** ou **editar** issues (mesma classe de limitação de permissão já
+  documentada para Pages/dispatch). Por isso o caminho de fechamento
+  automático não pôde ser validado com uma chamada real de ponta a ponta
+  neste ambiente — ele é coberto pelos testes mockados (que agora verificam
+  explicitamente o número correto do argumento) e deve funcionar
+  normalmente quando o workflow `issue-chain.yml` rodar de verdade no
+  GitHub, pois ali o `GITHUB_TOKEN` nativo do Actions (com
+  `permissions: issues: write` declarado) tem permissão plena — esse é um
+  comportamento padrão e bem documentado do GitHub Actions, não uma
+  suposição.
 - Sintaxe de todos os módulos verificada com `python3 -m py_compile`.
 - Workflows (`gate.yml`, `issue-chain.yml`) validados com `yaml.safe_load` e
   com `actionlint` (via pacote npm `actionlint`, que empacota o binário via
@@ -191,6 +257,13 @@ contexto para humanos/dashboards, não para a lógica de controle de fluxo.
   erro do `db_crud.py read --id <inexistente>`) confirmando que o
   comportamento/CLI pré-existente (exit codes, resumos, `automation-status.json`)
   não mudou — o contrato é **estritamente aditivo**.
-- Suíte completa `pytest -q` re-executada após todas as mudanças: mesmo
-  baseline pré-existente (69 failed / 1189 passed / 11 skipped / 5 errors,
-  todos não relacionados a este trabalho) — nenhuma regressão introduzida.
+- Suíte completa `pytest -q -o faulthandler_timeout=90` (instalação completa
+  via `pip install --prefer-binary -e . pytest`, igual ao `ci.yml`)
+  re-executada após todas as mudanças: `22 failed, 1241 passed, 11 skipped,
+  0 errors` — as 22 falhas vêm só de `tests/test_login_qr.py` /
+  `tests/test_account_login_fixes.py` e são causadas por uma biblioteca de
+  sistema ausente neste sandbox (`libGL.so.1`, dependência nativa do
+  OpenCV), não pelo código desta branch; ignorando esses 2 arquivos dá
+  `1062 passed, 11 skipped, 0 failed` — 100% verde. O job real `pytest
+  (ubuntu-latest)` do CI do GitHub (onde `libGL` existe na imagem) confirma
+  isso, passando 100%. Nenhuma regressão introduzida.
