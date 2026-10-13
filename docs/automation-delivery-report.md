@@ -135,10 +135,28 @@ documentado do GitHub Actions, não uma suposição otimista.
 - ✅ Os três validadores de documentação/skills do próprio repositório
   (`validate_skill_commands.py`, `validate_skills.py`, `validate_document_paths.py`)
   continuam `OK` após as edições de docs.
-- ✅ CI real do GitHub (run `38409891106`, pré-existente a esta sessão) ficou
-  100% verde — 14/14 jobs `success` (1 `skipped` esperado). As mudanças desta
-  sessão (gate/chain) ainda **não foram** submetidas a um novo run do CI real
-  no momento em que este relatório foi escrito — ver seção 6.
+- ✅ CI real do GitHub rodou 100% verde duas vezes nesta branch: run
+  `38409891106` (commit `2c43564`, watchdog) e run `38413748495` (commit
+  `ee5b1e4`, gate + issue chain + retrofit do contrato) — 14/14 jobs
+  `success` em ambas (1 `skipped` esperado).
+- ⚠️ **Pendência conhecida, fora do controle deste agente:** o commit mais
+  recente desta sessão (`27c790d`, backend SQLite/OOP + correção do bug de
+  número de issue) foi confirmado como enviado com sucesso para
+  `origin/arena/feaf8e5f-ai-agent-social-media-easel` — verificado via
+  `git ls-remote` e via `GET /repos/.../compare/main...arena/...` (6 commits
+  à frente, último = `27c790d`) — mas, no momento em que este relatório foi
+  escrito, o GitHub ainda não havia processado o evento de sincronização do
+  PR nem disparado um novo run de CI para esse commit (`gh pr view`/`GET
+  .../pulls/1` continuavam reportando o `head.sha` anterior, e nenhum
+  `check-run`/status apareceu para o novo commit). Tentei disparar o `ci.yml`
+  manualmente (`gh workflow run ci.yml --ref arena/...`) como contorno, mas
+  recebi o mesmo `403 Resource not accessible by integration` já documentado
+  para outras ações administrativas deste ambiente — o token deste sandbox
+  não tem permissão `actions: write`. Isso não é um problema no código: é um
+  atraso/falha de propagação do lado do GitHub que só pode ser resolvido
+  esperando (o CI deve disparar sozinho assim que o GitHub processar o
+  evento) ou por alguém com acesso de mantenedor clicando em "Run workflow"
+  manualmente.
 - ✅ **Issues habilitado nesta sessão** (`gh repo view --json
   hasIssuesEnabled` → `true`) e o fluxo completo (`--init`, avanço com
   sucesso, criação automática da próxima etapa) foi validado contra o
