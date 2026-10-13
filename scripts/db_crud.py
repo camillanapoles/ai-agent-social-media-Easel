@@ -35,6 +35,9 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import action_contract as contract  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "db.json"
 STATUS_PATH = REPO_ROOT / "data" / "automation-status.json"
@@ -184,11 +187,26 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     db = load_db()
-    result = OPS[args.operation](db, args)
+    action_id = f"db-crud-{args.operation}"
+    try:
+        result = OPS[args.operation](db, args)
+    except SystemExit as exc:
+        contract_result = contract.build_result(action_id, str(exc), 1)
+        contract.emit(contract_result)
+        contract.merge_into_status_file(STATUS_PATH, "db_crud", contract_result)
+        raise
+
     if args.operation in {"create", "update", "delete"}:
         save_db(db)
     write_summary(result, db)
     write_status(result, db)
+
+    contract_result = contract.build_result(
+        action_id, f"operação '{args.operation}' concluída com sucesso",
+        contract.STATUS_SUCCESS, attachments=["data/db.json"],
+    )
+    contract.emit(contract_result)
+    contract.merge_into_status_file(STATUS_PATH, "db_crud", contract_result)
     return 0
 
 

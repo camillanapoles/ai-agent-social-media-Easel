@@ -20,10 +20,14 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import sys
 import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import action_contract as contract  # noqa: E402
+
 DATA_DIR = REPO_ROOT / "data"
 OBJECTS_DIR = REPO_ROOT / "dist-objects"
 STATUS_PATH = DATA_DIR / "automation-status.json"
@@ -80,6 +84,14 @@ def main() -> int:
         with open(gh_output, "a", encoding="utf-8") as fh:
             fh.write(f"object_name={object_name}\n")
             fh.write(f"object_path={object_path}\n")
+
+    contract_result = contract.build_result(
+        "function-backup-object",
+        f"objeto de backup gerado: {object_name} ({size_bytes} bytes)",
+        contract.STATUS_SUCCESS, attachments=[str(object_path.relative_to(REPO_ROOT))],
+    )
+    contract.emit(contract_result)
+    contract.merge_into_status_file(STATUS_PATH, "backup_object", contract_result)
     return 0
 
 

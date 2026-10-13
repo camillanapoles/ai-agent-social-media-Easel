@@ -11,9 +11,13 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import action_contract as contract  # noqa: E402
+
 DATA_DIR = REPO_ROOT / "data"
 DB_PATH = DATA_DIR / "db.json"
 STATS_PATH = DATA_DIR / "stats.json"
@@ -71,6 +75,13 @@ def main() -> int:
         "run_id": os.environ.get("GITHUB_RUN_ID"),
     }
     STATUS_PATH.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    contract_result = contract.build_result(
+        "function-report", "relatório consolidado gerado",
+        contract.STATUS_SUCCESS, attachments=["data/report.md"],
+    )
+    contract.emit(contract_result)
+    contract.merge_into_status_file(STATUS_PATH, "report", contract_result)
     return 0
 
 

@@ -18,6 +18,8 @@ const WORKFLOWS = [
   { id: "crud-data.yml", title: "Backend · CRUD Data", desc: "Create/Read/Update/Delete sobre data/db.json, com cache e object storage." },
   { id: "functions.yml", title: "Backend · Functions", desc: "stats_indexer (cache), backup_object (object storage), report." },
   { id: "watchdog.yml", title: "Watchdog · Continuidade & Recuperação", desc: "Roda sozinho a cada 6h: reexecuta falhas, cura data/db.json corrompido, alerta via Issue." },
+  { id: "gate.yml", title: "Continuity Gate", desc: "Positivo só sem issues bloqueantes, CI/CD verde e testes passando; senão sinaliza continuidade (retry)." },
+  { id: "issue-chain.yml", title: "Issue Chain · Orquestrador BPMN", desc: "Ao concluir/testar uma issue [Pipeline #N], fecha N e abre N+1 automaticamente; em erro, mantém e retenta N." },
   { id: "pages.yml", title: "Deploy do Painel (Pages)", desc: "Publica este próprio dashboard no GitHub Pages." },
 ];
 
@@ -201,7 +203,19 @@ async function loadStatus() {
         cacheEl.innerHTML += `<div class="status-row"><span>watchdog · auto-recuperado</span><span>${escapeHtml(wd.recovered.join(", "))}</span></div>`;
       }
     }
-    if (!stats && !status.crud && !wd) cacheEl.innerHTML = `<div class="status-row"><span>ainda sem execuções registradas</span></div>`;
+    const gate = status.gate;
+    if (gate) {
+      const gateLabel = gate.status === 0 ? "positivo ✅" : `continuidade ⏳ (status ${gate.status}: ${escapeHtml(gate.status_label || "")})`;
+      cacheEl.innerHTML += `<div class="status-row"><span>continuity gate</span><span>${gateLabel}</span></div>`;
+    }
+    const chain = status.issue_chain;
+    if (chain) {
+      const chainLabel = chain.status === 0
+        ? `avançou para a issue #${escapeHtml(chain.next_issue)} ✅`
+        : `retendo issue #${escapeHtml(chain.next_issue)} ⏳ (status ${chain.status})`;
+      cacheEl.innerHTML += `<div class="status-row"><span>issue chain</span><span>${chainLabel}</span></div>`;
+    }
+    if (!stats && !status.crud && !wd && !gate && !chain) cacheEl.innerHTML = `<div class="status-row"><span>ainda sem execuções registradas</span></div>`;
     return status;
   } catch {
     cacheEl.innerHTML = `<div class="status-row"><span>data/automation-status.json ainda não existe — rode alguma pipeline</span></div>`;

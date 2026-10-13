@@ -34,6 +34,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import action_contract as contract  # noqa: E402
+
+contract.register_status(1, "transient_failure_auto_recovered")
+contract.register_status(2, "db_integrity_failed_unhealed")
+contract.register_status(3, "persistent_cicd_failure_alert_opened")
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "db.json"
 STATUS_PATH = REPO_ROOT / "data" / "automation-status.json"
@@ -229,6 +236,22 @@ def main(argv: list[str] | None = None) -> int:
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as fh:
             fh.write(text)
+
+    if persistent_failures:
+        wf_status, wf_message = 3, f"falha persistente em: {', '.join(r['workflow'] for r in persistent_failures)}"
+    elif not db_ok and not healed:
+        wf_status, wf_message = 2, "integridade de data/db.json falhou e não foi possível restaurar"
+    elif recovered:
+        wf_status, wf_message = 1, f"falha(s) transitória(s) reexecutada(s) automaticamente: {', '.join(recovered)}"
+    else:
+        wf_status, wf_message = contract.STATUS_SUCCESS, "tudo verde: sem falhas, db íntegro"
+
+    contract_result = contract.build_result(
+        "watchdog", wf_message, wf_status,
+        attachments=["data/automation-status.json"],
+    )
+    contract.emit(contract_result)
+    contract.merge_into_status_file(STATUS_PATH, "watchdog", contract_result)
 
     return 0
 

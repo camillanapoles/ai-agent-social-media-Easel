@@ -16,9 +16,13 @@ import datetime as dt
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import action_contract as contract  # noqa: E402
+
 DB_PATH = REPO_ROOT / "data" / "db.json"
 STATS_PATH = REPO_ROOT / "data" / "stats.json"
 STATUS_PATH = REPO_ROOT / "data" / "automation-status.json"
@@ -96,6 +100,14 @@ def main() -> int:
         "run_id": os.environ.get("GITHUB_RUN_ID"),
     }
     STATUS_PATH.write_text(json.dumps(existing, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    contract_result = contract.build_result(
+        "function-stats-indexer",
+        f"stats recalculados ({'cache hit' if cache_hit else 'cache miss'}), digest={digest}",
+        contract.STATUS_SUCCESS, attachments=["data/stats.json"],
+    )
+    contract.emit(contract_result)
+    contract.merge_into_status_file(STATUS_PATH, "stats_indexer", contract_result)
     return 0
 
 

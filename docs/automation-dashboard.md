@@ -39,8 +39,14 @@ functions/
 └── report.py                 relatório consolidado em Markdown
 
 scripts/
+├── action_contract.py        contrato JSON padrão (id/message/attachments/status/next_issue)
 ├── db_crud.py                CRUD (create/read/update/delete/list) — o "BACKEND"
-└── watchdog.py               monitora, recupera e cura as pipelines — a "CONTINUIDADE"
+├── watchdog.py               monitora, recupera e cura as pipelines — a "CONTINUIDADE"
+├── gate_check.py             gate de continuidade (issues bloqueantes + CI/CD + testes)
+└── issue_chain.py            orquestrador de pipeline indexado por Issues (estilo BPMN)
+
+.github/pipeline-issues/
+└── <N>.md                    template da issue `[Pipeline #N]` (título na 1ª linha + corpo)
 
 dashboard/
 ├── index.html                painel (terminal web + cards de pipelines + tabelas)
@@ -51,6 +57,8 @@ dashboard/
 ├── crud-data.yml             botão "Backend · CRUD Data"
 ├── functions.yml             botão "Backend · Functions"
 ├── watchdog.yml              roda sozinho (cron) — continuidade & auto-recuperação
+├── gate.yml                  roda sozinho (cron) — gate de continuidade (ver docs/issue-chain-pipeline.md)
+├── issue-chain.yml           orquestra o pipeline indexado por Issues (ver docs/issue-chain-pipeline.md)
 └── pages.yml                 publica dashboard/ no GitHub Pages
 ```
 
@@ -90,6 +98,15 @@ Em ambos os casos, o painel também traz um **terminal web** (`help`, `status`,
   alerta via Issue. Ver seção "Continuidade e recuperação" abaixo.
 - **Deploy do Painel** (`pages.yml`) — builda e publica `dashboard/` sempre
   que a pasta muda, ou manualmente.
+- **Continuity Gate** (`gate.yml`) — `schedule` a cada 6h + `workflow_dispatch`
+  + `repository_dispatch`. Só fica positivo (status `0`) sem issues
+  bloqueantes abertas, com CI/CD verde e testes passando. Ver
+  [`docs/issue-chain-pipeline.md`](issue-chain-pipeline.md).
+- **Issue Chain** (`issue-chain.yml`) — orquestrador estilo BPMN: ao fechar
+  (ou reportar sucesso testado para) uma issue `[Pipeline #N]`, avança
+  automaticamente para a `[Pipeline #N+1]`. Ver
+  [`docs/issue-chain-pipeline.md`](issue-chain-pipeline.md) para o schema
+  completo do contrato de retorno e exemplos de uso.
 
 Cada execução grava um resumo em **Job Summary** (visível direto na aba
 Actions) e atualiza `data/automation-status.json`, que é o que o dashboard lê
@@ -163,6 +180,28 @@ vez:
 
 Depois disso, toda alteração em `dashboard/` publica automaticamente.
 
+## Habilitando o GitHub Issues (passo manual único, necessário para o Issue Chain)
+
+O repositório está hoje com **Issues desabilitado** nas configurações
+(`Settings → General → Features`), e o token de automação deste ambiente não
+tem permissão (`administration:write`) para ligar essa chave remotamente —
+mesma limitação de origem do item acima sobre Pages. O **Continuity Gate**
+(`gate.yml`) funciona normalmente sem Issues (ele só reporta `status=1` se
+encontrar uma pendente), mas o **Issue Chain** (`issue-chain.yml`) depende de
+Issues para existir: sem elas, qualquer execução retorna o contrato de erro
+`status=4` (`issues_disabled`) explicando exatamente este passo.
+
+Para habilitar, uma única vez, um mantenedor com acesso de admin precisa:
+
+1. Abrir **Settings → General** no repositório.
+2. Em **Features**, marcar a caixa **Issues**.
+3. (Opcional) rodar `gh workflow run issue-chain.yml -f issue_number=1 -f
+   init=true` para criar a primeira issue do pipeline (`[Pipeline #1]`).
+
+Depois disso, o fluxo descrito em
+[`docs/issue-chain-pipeline.md`](issue-chain-pipeline.md) funciona de ponta a
+ponta sem nenhuma intervenção manual adicional.
+
 ## Testando localmente
 
 ```bash
@@ -182,6 +221,20 @@ python scripts/watchdog.py
 python scripts/watchdog.py --no-gh          # só valida integridade local, sem chamar a API
 python scripts/watchdog.py --no-recovery    # diagnostica sem reexecutar/curar nada
 
+# Continuity gate (requer `gh` autenticado; --no-gh assume positivo, uso em teste)
+python scripts/gate_check.py
+python scripts/gate_check.py --no-gh
+
+# Issue chain (requer `gh` autenticado + Issues habilitado no repo)
+python scripts/issue_chain.py --init --issue 1
+python scripts/issue_chain.py --issue 1 --result success --message "Etapa concluída e testada"
+python scripts/issue_chain.py --issue 1 --result failure --message "Build quebrou em X"
+
 # Painel (dashboard) — qualquer servidor estático
 cd dashboard && python3 -m http.server 8080
 ```
+
+Detalhes completos do gate de continuidade e do orquestrador de Issues — o
+schema exato do contrato JSON de retorno, os códigos de `status`, e o
+blueprint estilo BPMN do fluxo — estão em
+[`docs/issue-chain-pipeline.md`](issue-chain-pipeline.md).
