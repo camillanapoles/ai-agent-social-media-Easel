@@ -305,7 +305,7 @@ Profiles can also be created and edited from the Web workspace.
 Easel/
 ├── easel/                    Python CLI
 ├── web/                      FastAPI backend and React workspace
-├── skills/openclaw/          Discover, plan, produce, publish, and attribution Skills
+├── skills/builtin/           Discover, plan, produce, publish, and attribution Skills
 ├── skills/shared/            Shared scripts and references
 ├── assets/                   Brand, README media, and imported assets
 ├── profiles/                 Account profiles
@@ -315,6 +315,8 @@ Easel/
 ├── data/                     CRUD "database" (data/db.json) and automation status
 ├── functions/                On-demand serverless-style scripts (cache / object storage / report)
 └── docs/                     Specifications, capability map, architecture docs, and automation guide
+├── agents/                   Shared Agent workspace, harness configuration, and sync scripts
+└── docs/                     Specifications, capability map, and architecture docs
 ```
 
 Easel uses an isolated `easel` OpenClaw profile and does not overwrite an existing OpenClaw setup. The Web workspace defaults to port `7860`; the gateway port is chosen by OpenClaw (non-default profiles get a hashed port — `easel` → `37289`, not `18789`) and is resolved automatically by Easel.

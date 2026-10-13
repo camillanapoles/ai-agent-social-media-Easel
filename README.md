@@ -368,7 +368,7 @@ cp -r profiles/_template "profiles/我的账号"
 Easel/
 ├── easel/                    Python CLI：chat / web / skill / doctor / ping
 ├── web/                      FastAPI 后端与 React 工作台
-├── skills/openclaw/          发现、策划、制作、发布、归因技能
+├── skills/builtin/           发现、策划、制作、发布、归因技能
 ├── skills/shared/            跨技能脚本与参考资料
 ├── assets/                   品牌、README 媒体与用户导入素材
 ├── profiles/                 账号画像（每个画像一个目录）
@@ -378,6 +378,8 @@ Easel/
 ├── data/                     CRUD "数据库"（data/db.json）与自动化状态
 ├── functions/                按需执行的 serverless 风格脚本（缓存 / object storage / 报告）
 └── docs/                     能力规范、能力地图、架构文档与自动化控制台指南
+├── agents/                   共享 Agent 工作区、底座配置与同步脚本
+└── docs/                     能力规范、能力地图与架构文档
 ```
 
 Easel 使用独立的 `easel` OpenClaw profile，不会覆盖你本机已有的 OpenClaw 配置。Web 默认运行在 `7860`；gateway 端口由 OpenClaw 决定（非默认 profile 会分配哈希端口，如 `easel` → `37289`，不是 `18789`），Easel 会自动解析，无需手配。
