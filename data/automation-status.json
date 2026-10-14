@@ -1,0 +1,54 @@
+{
+  "watchdog": {
+    "component": "watchdog",
+    "checked_at": "2026-10-14T11:09:43Z",
+    "results": [
+      {
+        "workflow": "crud-data.yml",
+        "status": "no-runs",
+        "conclusion": null,
+        "run_id": null,
+        "html_url": null
+      },
+      {
+        "workflow": "functions.yml",
+        "status": "no-runs",
+        "conclusion": null,
+        "run_id": null,
+        "html_url": null
+      },
+      {
+        "workflow": "pages.yml",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_id": 38489676600,
+        "html_url": "https://github.com/camillanapoles/ai-agent-social-media-Easel/actions/runs/38489676600"
+      }
+    ],
+    "recovered": [
+      "pages.yml"
+    ],
+    "db_integrity_ok": true,
+    "db_healed": false,
+    "consecutive_failures": {
+      "crud-data.yml": 0,
+      "functions.yml": 0,
+      "pages.yml": 1
+    },
+    "alert_opened": false
+  },
+  "contracts": {
+    "watchdog": {
+      "id": "watchdog",
+      "message": "falha(s) transitória(s) reexecutada(s) automaticamente: pages.yml",
+      "attachments": [
+        "data/automation-status.json"
+      ],
+      "status": 1,
+      "status_label": "transient_failure_auto_recovered",
+      "continuity": true,
+      "next_issue": null,
+      "emitted_at": "2026-10-14T11:09:43Z"
+    }
+  }
+}
