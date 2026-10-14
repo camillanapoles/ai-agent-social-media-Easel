@@ -23,12 +23,14 @@ const WORKFLOWS = [
   { id: "pages.yml", title: "Deploy do Painel (Pages)", desc: "Publica este próprio dashboard no GitHub Pages." },
 ];
 
+/** Retorna o primeiro elemento que corresponde ao seletor CSS. */
 const $ = (sel) => document.querySelector(sel);
 
 // Escapa texto vindo de fontes remotas (API do GitHub / data/db.json) antes de
 // injetar em innerHTML — defesa em profundidade: mesmo que workflow_dispatch
 // exija permissão de escrita no repositório para ser acionado, nunca
 // confiamos cegamente em strings vindas de fora ao montar HTML no cliente.
+/** Escapa caracteres especiais para exibir valores como texto no HTML. */
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -36,11 +38,16 @@ function escapeHtml(value) {
 }
 
 
+/** Retorna a chave de armazenamento local do token da automação. */
 function tokenKey() { return "easel_automation_pat"; }
+/** Lê o token salvo neste navegador, ou uma string vazia quando ausente. */
 function getToken() { return localStorage.getItem(tokenKey()) || ""; }
+/** Salva o token no armazenamento local deste navegador. */
 function setToken(v) { localStorage.setItem(tokenKey(), v); }
+/** Remove o token salvo no armazenamento local deste navegador. */
 function clearToken() { localStorage.removeItem(tokenKey()); }
 
+/** Consulta a API do repositório com o token salvo, se houver, e retorna a resposta HTTP. */
 async function ghFetch(path, opts = {}) {
   const headers = Object.assign({ Accept: "application/vnd.github+json" }, opts.headers || {});
   const token = getToken();
@@ -49,6 +56,7 @@ async function ghFetch(path, opts = {}) {
   return res;
 }
 
+/** Retorna a classe CSS e o rótulo do badge conforme o estado da execução. */
 function badgeFor(run) {
   if (!run) return { cls: "unknown", label: "sem execuções" };
   if (run.status !== "completed") return { cls: "pending", label: run.status };
@@ -57,6 +65,7 @@ function badgeFor(run) {
   return { cls: "unknown", label: run.conclusion || "desconhecido" };
 }
 
+/** Formata a data em pt-BR ou retorna um travessão quando ausente. */
 function fmtDate(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -64,6 +73,7 @@ function fmtDate(iso) {
 }
 
 // ---------- Pipelines ----------
+/** Renderiza os cards de workflows, consulta suas últimas runs e conecta os botões. */
 async function loadPipelines() {
   const grid = $("#pipeline-grid");
   grid.innerHTML = "";
@@ -104,6 +114,7 @@ async function loadPipelines() {
   }
 }
 
+/** Dispara o workflow com o token salvo ou abre sua página de execução no GitHub. */
 async function dispatchOrOpen(workflowId) {
   const token = getToken();
   const url = `https://github.com/${OWNER}/${REPO}/actions/workflows/${workflowId}`;
@@ -132,6 +143,7 @@ async function dispatchOrOpen(workflowId) {
 }
 
 // ---------- CRUD DB table ----------
+/** Carrega data/db.json e renderiza os registros na tabela do painel. */
 async function loadDb() {
   const tbody = document.querySelector("#db-table tbody");
   try {
@@ -153,6 +165,7 @@ async function loadDb() {
 }
 
 // ---------- Object storage ----------
+/** Lista os assets da release data-store ou exibe o estado vazio ou indisponível. */
 async function loadStorage() {
   const el = $("#storage-list");
   el.innerHTML = "";
@@ -179,6 +192,7 @@ async function loadStorage() {
 }
 
 // ---------- Cache + status ----------
+/** Renderiza o status da automação e retorna os dados carregados, ou null em erro. */
 async function loadStatus() {
   const cacheEl = $("#cache-status");
   try {
@@ -224,6 +238,7 @@ async function loadStatus() {
 }
 
 // ---------- Recent runs across all workflows ----------
+/** Renderiza as seis últimas execuções do repositório com links e badges. */
 async function loadRuns() {
   const el = $("#runs-list");
   el.innerHTML = "";
@@ -245,6 +260,7 @@ async function loadRuns() {
 }
 
 // ---------- Terminal ----------
+/** Adiciona uma linha de texto ao terminal e rola até a saída mais recente. */
 function termPrint(text, cls = "") {
   const out = $("#terminal-output");
   const div = document.createElement("div");
@@ -266,6 +282,7 @@ const HELP = `comandos disponíveis:
   token set <pat>      salva um token (fine-grained, Actions:write) localmente
   token clear          remove o token salvo`;
 
+/** Interpreta a linha do terminal e executa o comando disponível com seus argumentos. */
 async function runCommand(raw) {
   const line = raw.trim();
   if (!line) return;
@@ -343,11 +360,13 @@ async function runCommand(raw) {
   }
 }
 
+/** Atualiza o indicador de presença de um token salvo neste navegador. */
 function refreshTokenUi() {
   const has = !!getToken();
   $("#token-state").textContent = has ? "token salvo ✓" : "nenhum token salvo";
 }
 
+/** Conecta a tecla Enter à execução de comandos e imprime a mensagem inicial. */
 function wireTerminal() {
   const input = $("#terminal-input");
   input.addEventListener("keydown", (e) => {
@@ -360,6 +379,7 @@ function wireTerminal() {
   termPrint("Easel Automation Terminal — digite 'help' para começar.", "ok");
 }
 
+/** Conecta os controles de salvar e remover token e atualiza o indicador. */
 function wireAdvancedPanel() {
   $("#token-save").addEventListener("click", () => {
     const v = $("#token-input").value.trim();
@@ -369,6 +389,7 @@ function wireAdvancedPanel() {
   refreshTokenUi();
 }
 
+/** Configura os links do repositório e mostra o commit mais recente da branch. */
 async function loadRepoMeta() {
   $("#repo-link").href = `https://github.com/${OWNER}/${REPO}`;
   $("#actions-link").href = `https://github.com/${OWNER}/${REPO}/actions`;
@@ -385,6 +406,7 @@ async function loadRepoMeta() {
   }
 }
 
+/** Inicializa o painel, carrega seus dados e agenda a atualização de pipelines e runs. */
 function boot() {
   wireTerminal();
   wireAdvancedPanel();

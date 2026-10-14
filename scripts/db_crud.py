@@ -46,31 +46,37 @@ VALID_STATUSES = {"draft", "scheduled", "published", "archived"}
 
 
 def _now() -> str:
+    """Retorna o instante atual em UTC no formato ISO 8601 com sufixo Z."""
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def load_db() -> dict:
+    """Lê o banco JSON ou retorna um banco vazio quando o arquivo não existe."""
     if not DB_PATH.exists():
         return {"version": 1, "updated_at": _now(), "records": []}
     return json.loads(DB_PATH.read_text(encoding="utf-8"))
 
 
 def save_db(db: dict) -> None:
+    """Atualiza o timestamp do banco recebido e persiste seu conteúdo em DB_PATH."""
     db["updated_at"] = _now()
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     DB_PATH.write_text(json.dumps(db, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def next_id(db: dict) -> int:
+    """Retorna um ID acima do maior existente, ou 1 para um banco vazio."""
     ids = [r["id"] for r in db["records"]]
     return (max(ids) + 1) if ids else 1
 
 
 def op_list(db: dict, _args) -> dict:
+    """Retorna todos os registros e sua contagem sem alterar o banco."""
     return {"op": "list", "count": len(db["records"]), "records": db["records"]}
 
 
 def op_read(db: dict, args) -> dict:
+    """Retorna o registro solicitado por ID; encerra com erro se não existir."""
     rec = next((r for r in db["records"] if str(r["id"]) == str(args.id)), None)
     if rec is None:
         raise SystemExit(f"registro id={args.id} não encontrado")
@@ -78,6 +84,7 @@ def op_read(db: dict, args) -> dict:
 
 
 def op_create(db: dict, args) -> dict:
+    """Valida título e status, adiciona um registro ao banco e retorna o resultado."""
     if not args.title:
         raise SystemExit("--title é obrigatório para create")
     if args.status and args.status not in VALID_STATUSES:
@@ -95,6 +102,7 @@ def op_create(db: dict, args) -> dict:
 
 
 def op_update(db: dict, args) -> dict:
+    """Atualiza os campos informados do registro; encerra com erro se ausente ou inválido."""
     rec = next((r for r in db["records"] if str(r["id"]) == str(args.id)), None)
     if rec is None:
         raise SystemExit(f"registro id={args.id} não encontrado")
@@ -111,6 +119,7 @@ def op_update(db: dict, args) -> dict:
 
 
 def op_delete(db: dict, args) -> dict:
+    """Remove o registro solicitado por ID; encerra com erro se não existir."""
     before = len(db["records"])
     db["records"] = [r for r in db["records"] if str(r["id"]) != str(args.id)]
     if len(db["records"]) == before:
@@ -128,6 +137,7 @@ OPS = {
 
 
 def write_summary(result: dict, db: dict) -> None:
+    """Imprime o resultado CRUD e o anexa ao GitHub Step Summary quando configurado."""
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     lines = [
         "## 🗄️ Backend CRUD — resultado",
@@ -151,6 +161,7 @@ def write_summary(result: dict, db: dict) -> None:
 
 
 def write_status(result: dict, db: dict) -> None:
+    """Persiste o resumo CRUD no status da automação, preservando os outros componentes."""
     counts: dict[str, int] = {}
     for r in db["records"]:
         counts[r["status"]] = counts.get(r["status"], 0) + 1
@@ -178,6 +189,7 @@ def write_status(result: dict, db: dict) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Executa a operação CRUD da CLI, persiste alterações e emite seu contrato e resumos."""
     parser = argparse.ArgumentParser(description="CRUD de dados do painel de automação Easel")
     parser.add_argument("operation", choices=sorted(OPS))
     parser.add_argument("--id")

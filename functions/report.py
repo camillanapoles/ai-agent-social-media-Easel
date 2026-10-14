@@ -26,10 +26,12 @@ REPORT_PATH = DATA_DIR / "report.md"
 
 
 def _now() -> str:
+    """Retorna o instante atual em UTC no formato ISO 8601 com sufixo Z."""
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _read_json(path: Path) -> dict:
+    """Lê o JSON do caminho; retorna um dicionário vazio se ausente ou inválido."""
     if not path.exists():
         return {}
     try:
@@ -39,6 +41,7 @@ def _read_json(path: Path) -> dict:
 
 
 def main() -> int:
+    """Grava o relatório consolidado e atualiza o summary e o status da automação."""
     db = _read_json(DB_PATH)
     stats = _read_json(STATS_PATH)
     status = _read_json(STATUS_PATH)

@@ -48,6 +48,7 @@ def register_status(code: int, label: str) -> None:
 
 
 def _now() -> str:
+    """Retorna o instante atual em UTC no formato ISO 8601 com sufixo Z."""
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 

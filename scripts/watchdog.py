@@ -51,10 +51,12 @@ ALERT_TITLE = "🔴 Automation Watchdog: pipeline(s) falhando de forma persisten
 
 
 def _now() -> str:
+    """Retorna o instante atual em UTC no formato ISO 8601 com sufixo Z."""
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+    """Executa o comando na raiz do repositório e captura stdout e stderr."""
     return subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
 
 
@@ -74,6 +76,7 @@ def gh_json(*args: str):
 
 
 def check_workflow(workflow: str) -> dict:
+    """Resume a última execução do workflow, indicando no-runs quando não houver dados."""
     runs = gh_json(
         "run", "list", "--workflow", workflow, "--limit", "1",
         "--json", "databaseId,conclusion,status,url",
@@ -91,6 +94,7 @@ def check_workflow(workflow: str) -> dict:
 
 
 def attempt_recovery(run_id: int) -> bool:
+    """Solicita a reexecução dos jobs falhos da run e retorna se gh aceitou o pedido."""
     print(f"[watchdog] tentando auto-recuperação: reexecutando jobs que falharam na run {run_id}")
     result = _run(["gh", "run", "rerun", str(run_id), "--failed"])
     if result.returncode != 0:
@@ -100,6 +104,7 @@ def attempt_recovery(run_id: int) -> bool:
 
 
 def validate_db_integrity() -> bool:
+    """Verifica se DB_PATH contém JSON com records do tipo lista; retorna False em erro."""
     try:
         data = json.loads(DB_PATH.read_text(encoding="utf-8"))
         return isinstance(data.get("records"), list)
@@ -137,6 +142,7 @@ def heal_db() -> bool:
 
 
 def manage_alert_issue(failing: list[dict]) -> bool:
+    """Comenta o alerta existente ou tenta criar uma issue para as falhas persistentes."""
     existing = gh_json(
         "issue", "list", "--search", f"{ALERT_TITLE} in:title",
         "--state", "open", "--json", "number",
@@ -158,6 +164,7 @@ def manage_alert_issue(failing: list[dict]) -> bool:
 
 
 def load_status() -> dict:
+    """Lê o status da automação; retorna um dicionário vazio se ausente ou JSON inválido."""
     if not STATUS_PATH.exists():
         return {}
     try:
@@ -167,11 +174,13 @@ def load_status() -> dict:
 
 
 def save_status(status: dict) -> None:
+    """Cria o diretório necessário e grava o status recebido como JSON."""
     STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATUS_PATH.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Monitora workflows e banco, aplica a recuperação permitida e grava o status e o contrato."""
     parser = argparse.ArgumentParser(description="Watchdog de continuidade/recuperação do CI/CD")
     parser.add_argument("--no-recovery", action="store_true", help="só diagnostica, não reexecuta nem cura nada")
     parser.add_argument("--no-gh", action="store_true", help="pula chamadas de gh (uso em teste local offline)")

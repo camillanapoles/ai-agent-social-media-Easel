@@ -34,10 +34,12 @@ STATUS_PATH = DATA_DIR / "automation-status.json"
 
 
 def _now() -> str:
+    """Retorna o instante atual em UTC no formato ISO 8601 com sufixo Z."""
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def main() -> int:
+    """Compacta data/ em um ZIP e registra o objeto no status e nos outputs do workflow."""
     OBJECTS_DIR.mkdir(parents=True, exist_ok=True)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     object_name = f"easel-data-backup-{stamp}.zip"

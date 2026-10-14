@@ -20,6 +20,7 @@ FAIL = []
 
 
 def check(name, condition, detail=""):
+    """Registra o cenário em PASS ou FAIL, incluindo detalhes quando a condição é falsa."""
     if condition:
         PASS.append(name)
     else:

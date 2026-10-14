@@ -46,10 +46,12 @@ contract.register_status(6, "execution_failed")
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+    """Executa o comando na raiz do repositório e captura stdout e stderr."""
     return subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
 
 
 def gh_json(*args: str):
+    """Decodifica a saída JSON de gh; retorna None em erro, saída vazia ou JSON inválido."""
     result = _run(["gh", *args])
     if result.returncode != 0:
         return None
@@ -63,11 +65,13 @@ def gh_json(*args: str):
 
 
 def issues_enabled() -> bool:
+    """Consulta se o repositório tem GitHub Issues habilitado."""
     data = gh_json("repo", "view", "--json", "hasIssuesEnabled")
     return bool(data and data.get("hasIssuesEnabled"))
 
 
 def find_issue_by_index(index: int) -> dict | None:
+    """Busca uma issue aberta ou fechada cujo título contém exatamente o índice do pipeline."""
     needle = f"[Pipeline #{index}]"
     data = gh_json("issue", "list", "--state", "all", "--search", needle,
                    "--json", "number,title,state,url") or []
@@ -96,16 +100,19 @@ def load_template(index: int) -> tuple[str, str]:
 
 
 def close_issue_with_comment(number: int, body: str) -> bool:
+    """Comenta e fecha a issue; retorna True somente se ambos os comandos tiverem sucesso."""
     r1 = _run(["gh", "issue", "comment", str(number), "--body", body])
     r2 = _run(["gh", "issue", "close", str(number)])
     return r1.returncode == 0 and r2.returncode == 0
 
 
 def comment_issue(number: int, body: str) -> bool:
+    """Publica o comentário na issue e retorna se o comando teve sucesso."""
     return _run(["gh", "issue", "comment", str(number), "--body", body]).returncode == 0
 
 
 def create_next_issue(index: int) -> int | None:
+    """Cria a issue indexada a partir do template e retorna seu número no GitHub, ou None."""
     title_suffix, body = load_template(index)
     title = f"[Pipeline #{index}] {title_suffix}"
     result = _run(["gh", "issue", "create", "--title", title, "--body", body])
@@ -119,6 +126,7 @@ def create_next_issue(index: int) -> int | None:
 
 
 def save_status(result: dict) -> None:
+    """Grava o contrato da issue chain no status, preservando as outras chaves."""
     existing = {}
     if STATUS_PATH.exists():
         try:
@@ -131,6 +139,7 @@ def save_status(result: dict) -> None:
 
 
 def advance(issue_index: int, outcome: str, message: str, attachments: list[str] | None) -> dict:
+    """Emite e salva o contrato; tenta avançar a issue somente com sucesso e gate positivo."""
     action_id = f"issue-chain-{issue_index}"
     attachments = attachments or []
 
@@ -249,18 +258,23 @@ class IssueFactory:
     coberta pelos testes de `dev_check_issue_chain.py`."""
 
     def issues_enabled(self) -> bool:
+        """Delega a consulta de habilitação de Issues à integração com gh."""
         return issues_enabled()
 
     def find(self, index: int) -> dict | None:
+        """Delega a busca da issue pelo índice do pipeline."""
         return find_issue_by_index(index)
 
     def create(self, index: int) -> int | None:
+        """Delega a criação da issue e retorna seu número no GitHub, ou None."""
         return create_next_issue(index)
 
     def comment(self, github_number: int, body: str) -> bool:
+        """Delega a publicação do comentário e retorna se teve sucesso."""
         return comment_issue(github_number, body)
 
     def close_with_comment(self, github_number: int, body: str) -> bool:
+        """Delega o comentário e fechamento da issue e retorna se ambos tiveram sucesso."""
         return close_issue_with_comment(github_number, body)
 
 
@@ -275,6 +289,7 @@ class IssueChainOrchestrator:
     `unittest.mock` em `dev_check_issue_chain.py`."""
 
     def __init__(self, factory: IssueFactory | None = None, store=None):
+        """Usa a fábrica e o store recebidos, criando as instâncias padrão quando omitidos."""
         self.factory = factory or IssueFactory()
         if store is None:
             import pipeline_store  # import tardio: evita custo p/ quem só usa advance()/init_chain()
@@ -284,6 +299,7 @@ class IssueChainOrchestrator:
 
     def advance(self, issue_index: int, outcome: str, message: str,
                 attachments: list[str] | None = None) -> dict:
+        """Registra a issue conhecida, delega o avanço e persiste o contrato no histórico local."""
         issue = self.factory.find(issue_index)
         if issue is not None:
             self.store.upsert_stage(issue_index, issue["number"], title=issue["title"])
@@ -292,6 +308,7 @@ class IssueChainOrchestrator:
         return result
 
     def init(self, index: int) -> dict:
+        """Delega a inicialização e registra o contrato e a etapa no store local."""
         result = init_chain(index)
         self.store.record_event(index, result)
         issue_number = None
@@ -303,10 +320,12 @@ class IssueChainOrchestrator:
         return result
 
     def close(self) -> None:
+        """Fecha a conexão do store usado pelo orquestrador."""
         self.store.close()
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Inicializa ou avança a etapa pela CLI e fecha o store ao terminar."""
     parser = argparse.ArgumentParser(description="Avança o pipeline indexado por Issues")
     parser.add_argument("--issue", type=int, required=True)
     parser.add_argument("--result", choices=["success", "failure"], default="success",

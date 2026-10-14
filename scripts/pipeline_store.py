@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS events (
 
 
 def _now() -> str:
+    """Retorna o instante atual em UTC no formato ISO 8601 com sufixo Z."""
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -67,6 +68,7 @@ class PipelineStore:
     ou chame `.close()` manualmente."""
 
     def __init__(self, db_path: str | Path = DEFAULT_DB_PATH):
+        """Abre o banco SQLite no caminho informado e cria as tabelas ausentes."""
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path)
@@ -75,12 +77,15 @@ class PipelineStore:
         self._conn.commit()
 
     def __enter__(self) -> "PipelineStore":
+        """Retorna esta instância para uso como context manager."""
         return self
 
     def __exit__(self, *_exc: Any) -> None:
+        """Fecha a conexão ao sair do bloco with, inclusive em caso de exceção."""
         self.close()
 
     def close(self) -> None:
+        """Fecha a conexão SQLite desta instância."""
         self._conn.close()
 
     # -- escrita -----------------------------------------------------------
@@ -144,22 +149,26 @@ class PipelineStore:
 
     # -- leitura -------------------------------------------------------------
     def get_stage(self, index_number: int) -> dict[str, Any] | None:
+        """Retorna a etapa pelo índice, ou None quando não estiver registrada."""
         row = self._conn.execute(
             "SELECT * FROM stages WHERE index_number = ?", (index_number,)
         ).fetchone()
         return dict(row) if row else None
 
     def history(self, index_number: int) -> list[dict[str, Any]]:
+        """Retorna os eventos da etapa em ordem crescente de ID, com anexos em JSON textual."""
         rows = self._conn.execute(
             "SELECT * FROM events WHERE index_number = ? ORDER BY id ASC", (index_number,)
         ).fetchall()
         return [dict(r) for r in rows]
 
     def all_stages(self) -> list[dict[str, Any]]:
+        """Retorna todas as etapas ordenadas pelo índice do pipeline."""
         rows = self._conn.execute("SELECT * FROM stages ORDER BY index_number ASC").fetchall()
         return [dict(r) for r in rows]
 
     def latest_event(self, index_number: int) -> dict[str, Any] | None:
+        """Retorna o evento de maior ID da etapa, ou None quando não houver eventos."""
         row = self._conn.execute(
             "SELECT * FROM events WHERE index_number = ? ORDER BY id DESC LIMIT 1", (index_number,)
         ).fetchone()
@@ -167,6 +176,7 @@ class PipelineStore:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Consulta etapas ou histórico pela CLI e imprime o resultado como JSON."""
     parser = argparse.ArgumentParser(description="Consulta o backend SQLite do pipeline de issues")
     parser.add_argument("--db", default=str(DEFAULT_DB_PATH))
     group = parser.add_mutually_exclusive_group(required=True)

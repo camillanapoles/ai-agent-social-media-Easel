@@ -35,6 +35,7 @@ def commands(path: Path):
 
 
 def resolve_script(doc: Path, token: str) -> Path | None:
+    """Resolve o script relativo ao documento, skill ou raiz; ignora tokens com placeholders."""
     if any(char in token for char in "$<>{}*"):
         return None
     candidate = Path(token)
@@ -78,6 +79,7 @@ def cli_schema(script: Path) -> tuple[set[str], set[str]]:
 
 
 def main() -> int:
+    """Valida caminhos e opções dos comandos Python documentados e retorna 1 se houver erros."""
     failures = []
     checked = 0
     docs = sorted(SKILLS.rglob("*.md")) + sorted((ROOT / "agents").rglob("*.md")) \

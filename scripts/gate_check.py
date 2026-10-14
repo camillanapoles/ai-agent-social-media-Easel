@@ -43,10 +43,12 @@ contract.register_status(3, "blocked_missing_or_failing_tests")
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+    """Executa o comando na raiz do repositório e captura stdout e stderr."""
     return subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
 
 
 def gh_json(*args: str):
+    """Decodifica a saída JSON de gh; retorna None em erro, saída vazia ou JSON inválido."""
     result = _run(["gh", *args])
     if result.returncode != 0:
         print(f"[gate] gh {' '.join(args)} falhou: {result.stderr.strip()}", file=sys.stderr)
@@ -61,6 +63,7 @@ def gh_json(*args: str):
 
 
 def fetch_blocking_issues() -> list[dict]:
+    """Lista issues abertas com labels bloqueantes, sem duplicar números de issue."""
     issues: list[dict] = []
     for label in BLOCKING_LABELS:
         found = gh_json("issue", "list", "--state", "open", "--label", label,
@@ -77,6 +80,7 @@ def fetch_blocking_issues() -> list[dict]:
 
 
 def fetch_workflow_conclusions() -> dict[str, str | None]:
+    """Retorna a conclusão da última execução de cada workflow monitorado, ou None."""
     conclusions: dict[str, str | None] = {}
     for wf in MONITORED_WORKFLOWS:
         runs = gh_json("run", "list", "--workflow", wf, "--limit", "1",
@@ -124,6 +128,7 @@ def evaluate_gate(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Avalia o gate pela CLI e grava o contrato no status da automação."""
     parser = argparse.ArgumentParser(description="Gate de continuidade do pipeline")
     parser.add_argument("--no-gh", action="store_true", help="modo offline: assume tudo positivo (uso em teste)")
     parser.add_argument("--id", default="gate-check", help="id da action para o contrato de retorno")

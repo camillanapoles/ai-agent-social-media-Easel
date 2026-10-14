@@ -30,14 +30,17 @@ CACHE_DIR = REPO_ROOT / ".cache" / "stats"
 
 
 def _now() -> str:
+    """Retorna o instante atual em UTC no formato ISO 8601 com sufixo Z."""
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _hash_db(raw: bytes) -> str:
+    """Retorna os primeiros 16 caracteres do SHA-256 dos bytes do banco."""
     return hashlib.sha256(raw).hexdigest()[:16]
 
 
 def compute_stats(db: dict) -> dict:
+    """Conta registros por status e canal, incluindo o total e o instante de geração."""
     by_status: dict[str, int] = {}
     by_channel: dict[str, int] = {}
     for r in db.get("records", []):
@@ -52,6 +55,7 @@ def compute_stats(db: dict) -> dict:
 
 
 def main() -> int:
+    """Reutiliza ou calcula estatísticas pelo hash do banco e grava os resultados e o status."""
     raw = DB_PATH.read_bytes() if DB_PATH.exists() else b"{}"
     digest = _hash_db(raw)
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
