@@ -1,0 +1,101 @@
+name: Backend · Functions
+
+# "Functions" sob demanda (estilo serverless) empacotadas em functions/*.py,
+# cada uma acionável individualmente pelo botão correspondente no painel de
+# automação. Reaproveita o mesmo cache de stats do CRUD e os mesmos destinos
+# de object storage (Artifact + Release `data-store`).
+
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: "Function a executar"
+        type: choice
+        required: true
+        default: stats_indexer
+        options: [stats_indexer, backup_object, report, all]
+  repository_dispatch:
+    types: [run-function]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: functions
+  cancel-in-progress: false
+
+jobs:
+  run-function:
+    name: Function (${{ inputs.function || 'stats_indexer' }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Restore stats cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/stats
+          key: stats-index-${{ hashFiles('data/db.json') }}
+          restore-keys: |
+            stats-index-
+
+      - name: stats_indexer
+        if: inputs.function == 'stats_indexer' || inputs.function == 'all' || inputs.function == ''
+        run: python functions/stats_indexer.py
+
+      - name: backup_object
+        if: inputs.function == 'backup_object' || inputs.function == 'all'
+        run: python functions/backup_object.py
+
+      - name: report
+        if: inputs.function == 'report' || inputs.function == 'all'
+        run: python functions/report.py
+
+      - name: "Upload generated objects as artifact (object storage: short-term)"
+        uses: actions/upload-artifact@v4
+        with:
+          name: easel-functions-output-${{ github.run_number }}
+          path: |
+            data/stats.json
+            data/report.md
+            dist-objects/*.zip
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: "Publish backup objects to the data-store release (object storage: long-term)"
+        if: inputs.function == 'backup_object' || inputs.function == 'all'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view data-store >/dev/null 2>&1; then
+            gh release create data-store \
+              --title "Easel · Data Store (object storage)" \
+              --notes "Snapshot persistente de dados e backups, mantido pelas pipelines de automação." \
+              --latest=false
+          fi
+          shopt -s nullglob
+          files=(dist-objects/*.zip)
+          if [ ${#files[@]} -gt 0 ]; then
+            gh release upload data-store "${files[@]}" --clobber
+          fi
+
+      - name: Commit generated metadata back to the repository
+        run: |
+          set -euo pipefail
+          git config user.name "easel-automation-bot"
+          git config user.email "automation@users.noreply.github.com"
+          git add data/stats.json data/report.md data/automation-status.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Sem mudanças para commitar."
+          else
+            git commit -m "chore(functions): run ${{ inputs.function || 'stats_indexer' }} [skip ci]"
+            git push
+          fi

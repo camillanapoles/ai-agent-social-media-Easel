@@ -83,6 +83,14 @@ skill-test/
 skills/builtin/skill-wechat-publisher/wechat-publisher.yaml
 
 # 视频产线内置 SDK：源码+资产入库，但重依赖/缓存/模型不入库（bootstrap.sh 本地还原）
+skills/openclaw/video-production/vendor/**/node_modules/
+skills/openclaw/video-production/vendor/**/.remotion/
+skills/openclaw/video-production/vendor/**/models/
+skills/openclaw/video-production/vendor/**/*large-v3*
+
+# Automation dashboard (GitHub Actions + object storage demo)
+.cache/
+dist-objects/
 skills/builtin/video-production/vendor/**/node_modules/
 skills/builtin/video-production/vendor/**/.remotion/
 skills/builtin/video-production/vendor/**/models/

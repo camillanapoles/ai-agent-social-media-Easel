@@ -1,0 +1,60 @@
+name: Continuity Gate · Checagem de continuidade
+
+# Gate estilo BPMN: só fica "positivo" (status=0) quando NÃO existe issue
+# bloqueante aberta, NEM CI/CD com erro, NEM testes ausentes/falhando. Enquanto
+# não for positivo, o resultado sinaliza continuity=true (o pipeline deve
+# continuar monitorando/retentando, não deve ser tratado como condição final).
+#
+# Disparos:
+#   - schedule (cron): verificação periódica automática, para sempre;
+#   - workflow_dispatch: botão manual (painel, aba Actions, `gh workflow run`);
+#   - repository_dispatch: webhook externo (`curl -X POST .../dispatches`).
+
+on:
+  schedule:
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [gate]
+
+permissions:
+  actions: read
+  contents: write
+  issues: read
+
+concurrency:
+  group: continuity-gate
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Avaliar gate de continuidade
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.run_gate.outputs.status }}
+      continuity: ${{ steps.run_gate.outputs.continuity }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Run gate check
+        id: run_gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/gate_check.py --id "gate-${{ github.run_id }}"
+
+      - name: Commit updated status back to the repository
+        run: |
+          set -euo pipefail
+          git config user.name "easel-automation-bot"
+          git config user.email "automation@users.noreply.github.com"
+          git add data/automation-status.json
+          if git diff --cached --quiet; then
+            echo "Sem mudanças para commitar."
+          else
+            git commit -m "chore(gate): continuity check [skip ci]"
+            git push
+          fi

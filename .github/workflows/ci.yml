@@ -168,6 +168,13 @@ jobs:
       - name: Frontend regression tests
         run: node --test ../../tests/frontend/*.test.mjs
       - run: npm run build
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: easel-frontend-dist
+          path: web/frontend/dist
+          retention-days: 14
+          if-no-files-found: error
 
   # 真·跑一遍安装。只在 nightly / 手动触发 / 打了 ci:full-install 标签的 PR 上跑：
   # 一次完整安装要下 ~1GB（pip 的 opencv/faster-whisper/rembg + npm + Chromium），

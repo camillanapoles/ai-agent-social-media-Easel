@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Easel · Automation Control Center</title>
+<meta name="description" content="Painel de automação do Easel: CRUD de dados, functions, cache e CI/CD via GitHub Actions, publicado no GitHub Pages." />
+<link rel="icon" href="assets/icon-transparent.png" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>Easel <span class="muted">// Automation Control Center</span></h1>
+  </div>
+  <div class="repo-meta" id="repo-meta">carregando repositório…</div>
+</header>
+
+<main>
+  <section class="panel" id="panel-pipelines">
+    <h2>🚀 Pipelines (CI/CD)</h2>
+    <p class="hint">
+      Cada card é um workflow real do GitHub Actions deste repositório. O GitHub não permite
+      disparar <code>workflow_dispatch</code> a partir de uma página estática anônima — por isso o
+      botão <strong>“Executar”</strong> abre a tela oficial de execução no GitHub (onde um clique em
+      <em>“Run workflow”</em> já é o gatilho real). Se você colar um token pessoal no modo avançado
+      (rodapé), o botão dispara direto daqui, sem sair da página.
+    </p>
+    <div class="grid" id="pipeline-grid"><!-- preenchido via JS --></div>
+  </section>
+
+  <section class="panel" id="panel-terminal">
+    <h2>🖥️ Terminal Web</h2>
+    <p class="hint">Comandos reais contra a API pública do GitHub e os dados versionados do repo. Digite <code>help</code>.</p>
+    <div class="terminal" id="terminal">
+      <div class="terminal-output" id="terminal-output"></div>
+      <div class="terminal-input-row">
+        <span class="prompt">easel@automation:~$</span>
+        <input id="terminal-input" autocomplete="off" spellcheck="false" placeholder="help" />
+      </div>
+    </div>
+  </section>
+
+  <div class="columns">
+    <section class="panel" id="panel-db">
+      <h2>🗄️ Backend CRUD — data/db.json</h2>
+      <p class="hint">Fonte ao vivo: <code>raw.githubusercontent.com</code> (sem servidor próprio).</p>
+      <table class="data-table" id="db-table">
+        <thead><tr><th>ID</th><th>Título</th><th>Status</th><th>Canal</th><th>Atualizado</th></tr></thead>
+        <tbody><tr><td colspan="5">carregando…</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="panel" id="panel-storage">
+      <h2>📦 Object Storage</h2>
+      <p class="hint">Artifacts (curto prazo) e release <code>data-store</code> (permanente).</p>
+      <div id="storage-list" class="status-list">carregando…</div>
+    </section>
+  </div>
+
+  <div class="columns">
+    <section class="panel" id="panel-cache">
+      <h2>⚡ Cache</h2>
+      <p class="hint"><code>actions/cache</code> para pip/npm + cache de índice (<code>functions/stats_indexer.py</code>).</p>
+      <div id="cache-status" class="status-list">carregando…</div>
+    </section>
+
+    <section class="panel" id="panel-runs">
+      <h2>📜 Últimas execuções</h2>
+      <div id="runs-list" class="status-list">carregando…</div>
+    </section>
+  </div>
+
+  <section class="panel" id="panel-advanced">
+    <h2>🔐 Modo avançado (opcional)</h2>
+    <p class="hint">
+      Cole um <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">fine-grained
+      Personal Access Token</a> com permissão <code>Actions: Read and write</code> para que os botões
+      “Executar” disparem o workflow direto desta página, via <code>workflow_dispatch</code> da API do
+      GitHub. O token fica <strong>somente no seu navegador</strong> (<code>localStorage</code>) — nunca é
+      enviado a nenhum servidor além da própria API do GitHub.
+    </p>
+    <div class="token-row">
+      <input id="token-input" type="password" placeholder="github_pat_..." autocomplete="off" />
+      <button id="token-save">Salvar</button>
+      <button id="token-clear" class="secondary">Remover</button>
+      <span id="token-state" class="muted"></span>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>
+    Gerado e mantido por GitHub Actions · <a id="repo-link" href="#" target="_blank" rel="noopener">repositório</a>
+    · <a id="actions-link" href="#" target="_blank" rel="noopener">aba Actions</a>
+  </p>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

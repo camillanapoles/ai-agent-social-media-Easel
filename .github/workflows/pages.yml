@@ -1,0 +1,56 @@
+name: Deploy · Automation Dashboard (Pages)
+
+# Publica o painel estático (dashboard/) no GitHub Pages usando o fluxo oficial
+# do GitHub (configure-pages + upload-pages-artifact + deploy-pages), sem
+# depender de branch gh-pages. Dispara em push na pasta do painel/assets ou
+# manualmente pela aba Actions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - "assets/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Stage site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -r dashboard/. _site/
+          mkdir -p _site/assets
+          cp -f assets/icon-transparent.png _site/assets/icon-transparent.png 2>/dev/null || true
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

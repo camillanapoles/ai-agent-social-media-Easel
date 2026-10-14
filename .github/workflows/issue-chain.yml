@@ -1,0 +1,129 @@
+name: Issue Chain · Orquestrador de pipeline indexado
+
+# Fluxo estilo BPMN via GitHub Actions: quando uma issue `[Pipeline #N]` é
+# concluída/testada com sucesso, este workflow fecha a issue N e abre/aponta
+# para a issue N+1 (a próxima indexada). Em caso de erro — seja na execução
+# reportada, seja porque o gate de continuidade (gate.yml / gate_check.py)
+# ainda não está positivo — a issue N permanece aberta e o fluxo retenta o
+# MESMO nó (continuity=true).
+#
+# Toda execução grava o contrato de resultado padrão (id, message,
+# attachments, status, next_issue) em data/automation-status.json e nos
+# outputs do step, para que o botão/terminal/dashboard leiam sem ambiguidade.
+#
+# Disparos:
+#   - issues: closed → quando uma issue `[Pipeline #N]` é fechada manualmente
+#     (ou por outro processo), reavalia o estado como se fosse "success";
+#   - workflow_dispatch: botão manual com inputs issue_number/result/message;
+#   - repository_dispatch: webhook externo (`curl -X POST .../dispatches`
+#     com client_payload.issue_number/result/message).
+
+on:
+  issues:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Número/índice da issue [Pipeline #N]'
+        required: true
+        type: string
+      result:
+        description: 'Resultado da execução (ignorado se "init" = true)'
+        required: true
+        type: choice
+        options: [success, failure]
+        default: success
+      message:
+        description: 'Mensagem/log da execução'
+        required: false
+        type: string
+        default: 'Executado via workflow_dispatch'
+      init:
+        description: 'Criar a issue indexada em vez de avançar (bootstrap)'
+        required: false
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [issue-chain]
+
+permissions:
+  issues: write
+  contents: write
+  actions: read
+
+concurrency:
+  group: issue-chain
+  cancel-in-progress: false
+
+jobs:
+  advance:
+    name: Avaliar e avançar o pipeline
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'issues' ||
+      startsWith(github.event.issue.title, '[Pipeline #')
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Bootstrap de labels de automação (idempotente)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create automation-alert --color FF6B6B \
+            --description "Criada/atualizada automaticamente pelo watchdog/gate" || true
+          gh label create pipeline --color 0E8A16 \
+            --description "Issue de etapa do pipeline [Pipeline #N]" || true
+
+      - name: Resolver parâmetros do evento
+        id: params
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "issue_number=${{ inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+            echo "result=${{ inputs.result }}" >> "$GITHUB_OUTPUT"
+            echo "message=${{ inputs.message }}" >> "$GITHUB_OUTPUT"
+            echo "init=${{ inputs.init }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "issue_number=${{ github.event.client_payload.issue_number }}" >> "$GITHUB_OUTPUT"
+            echo "result=${{ github.event.client_payload.result }}" >> "$GITHUB_OUTPUT"
+            echo "message=${{ github.event.client_payload.message }}" >> "$GITHUB_OUTPUT"
+            echo "init=${{ github.event.client_payload.init || 'false' }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "issue_number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            echo "result=success" >> "$GITHUB_OUTPUT"
+            echo "message=Issue fechada manualmente no GitHub" >> "$GITHUB_OUTPUT"
+            echo "init=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run issue chain
+        id: run_chain
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.params.outputs.init }}" = "true" ]; then
+            python scripts/issue_chain.py --init --issue "${{ steps.params.outputs.issue_number }}"
+          else
+            python scripts/issue_chain.py \
+              --issue "${{ steps.params.outputs.issue_number }}" \
+              --result "${{ steps.params.outputs.result }}" \
+              --message "${{ steps.params.outputs.message }}"
+          fi
+
+      - name: Commit updated status back to the repository
+        run: |
+          set -euo pipefail
+          git config user.name "easel-automation-bot"
+          git config user.email "automation@users.noreply.github.com"
+          git add data/automation-status.json
+          [ -f data/pipeline.db ] && git add data/pipeline.db || true
+          if git diff --cached --quiet; then
+            echo "Sem mudanças para commitar."
+          else
+            git commit -m "chore(issue-chain): atualizar estado do pipeline [skip ci]"
+            git push
+          fi
