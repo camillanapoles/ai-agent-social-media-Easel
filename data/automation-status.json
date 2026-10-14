@@ -1,7 +1,7 @@
 {
   "watchdog": {
     "component": "watchdog",
-    "checked_at": "2026-10-14T16:30:38Z",
+    "checked_at": "2026-10-14T21:16:44Z",
     "results": [
       {
         "workflow": "crud-data.yml",
@@ -33,22 +33,22 @@
     "consecutive_failures": {
       "crud-data.yml": 0,
       "functions.yml": 0,
-      "pages.yml": 2
+      "pages.yml": 3
     },
-    "alert_opened": false
+    "alert_opened": true
   },
   "contracts": {
     "watchdog": {
       "id": "watchdog",
-      "message": "falha(s) transitória(s) reexecutada(s) automaticamente: pages.yml",
+      "message": "falha persistente em: pages.yml",
       "attachments": [
         "data/automation-status.json"
       ],
-      "status": 1,
-      "status_label": "transient_failure_auto_recovered",
+      "status": 3,
+      "status_label": "persistent_cicd_failure_alert_opened",
       "continuity": true,
       "next_issue": null,
-      "emitted_at": "2026-10-14T16:30:38Z"
+      "emitted_at": "2026-10-14T21:16:44Z"
     }
   },
   "gate": {
