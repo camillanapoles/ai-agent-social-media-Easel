@@ -1,7 +1,7 @@
 {
   "watchdog": {
     "component": "watchdog",
-    "checked_at": "2026-10-14T11:09:43Z",
+    "checked_at": "2026-10-14T16:30:38Z",
     "results": [
       {
         "workflow": "crud-data.yml",
@@ -33,7 +33,7 @@
     "consecutive_failures": {
       "crud-data.yml": 0,
       "functions.yml": 0,
-      "pages.yml": 1
+      "pages.yml": 2
     },
     "alert_opened": false
   },
@@ -48,7 +48,7 @@
       "status_label": "transient_failure_auto_recovered",
       "continuity": true,
       "next_issue": null,
-      "emitted_at": "2026-10-14T11:09:43Z"
+      "emitted_at": "2026-10-14T16:30:38Z"
     }
   },
   "gate": {
