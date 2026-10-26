@@ -1,7 +1,7 @@
 {
   "watchdog": {
     "component": "watchdog",
-    "checked_at": "2026-10-26T03:09:18Z",
+    "checked_at": "2026-10-26T12:14:16Z",
     "results": [
       {
         "workflow": "crud-data.yml",
@@ -33,7 +33,7 @@
     "consecutive_failures": {
       "crud-data.yml": 0,
       "functions.yml": 0,
-      "pages.yml": 46
+      "pages.yml": 47
     },
     "alert_opened": true
   },
@@ -48,7 +48,7 @@
       "status_label": "persistent_cicd_failure_alert_opened",
       "continuity": true,
       "next_issue": null,
-      "emitted_at": "2026-10-26T03:09:18Z"
+      "emitted_at": "2026-10-26T12:14:16Z"
     }
   },
   "gate": {
