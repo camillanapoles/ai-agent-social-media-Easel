@@ -50,13 +50,13 @@
     }
   },
   "gate": {
-    "id": "gate-41009711735",
+    "id": "gate-41057887422",
     "message": "CI/CD com erro em: ci.yml",
     "attachments": [],
     "status": 2,
     "status_label": "blocked_cicd_failure",
     "continuity": true,
     "next_issue": null,
-    "emitted_at": "2026-10-30T05:40:31Z"
+    "emitted_at": "2026-10-30T12:46:47Z"
   }
 }
