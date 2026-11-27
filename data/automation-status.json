@@ -1,7 +1,7 @@
 {
   "watchdog": {
     "component": "watchdog",
-    "checked_at": "2026-11-26T16:22:04Z",
+    "checked_at": "2026-11-27T01:28:27Z",
     "results": [
       {
         "workflow": "crud-data.yml",
@@ -46,7 +46,7 @@
       "status_label": "success",
       "continuity": false,
       "next_issue": null,
-      "emitted_at": "2026-11-26T16:22:04Z"
+      "emitted_at": "2026-11-27T01:28:27Z"
     }
   },
   "gate": {
